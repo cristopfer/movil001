@@ -10,28 +10,19 @@ def call_postgres_function(function_name, params=None):
     try:
         with connection.cursor() as cursor:
             if params:
-                # Para funciones con parámetros
                 placeholders = ', '.join(['%s'] * len(params))
-                query = f"SELECT * FROM {function_name}({placeholders})"
+                query = f"SELECT {function_name}({placeholders})"
                 cursor.execute(query, params)
             else:
-                # Para funciones sin parámetros
-                cursor.execute(f"SELECT * FROM {function_name}()")
+                cursor.execute(f"SELECT {function_name}()")
             
-            # Obtener descripción de las columnas para determinar el tipo de retorno
-            description = cursor.description
+            # Para funciones que retornan valores escalares
+            result = cursor.fetchone()
             
-            if description:  # Si retorna una tabla (múltiples columnas)
-                columns = [desc[0] for desc in description]
-                rows = cursor.fetchall()
-                # Convertir a lista de diccionarios
-                result = []
-                for row in rows:
-                    result.append(dict(zip(columns, row)))
-                return result
-            else:  # Si retorna un valor escalar
-                result = cursor.fetchone()
-                return result[0] if result else None
+            if result:
+                return result[0]  # Retornar el primer valor (escalar)
+            else:
+                return None
                 
     except psycopg2.Error as e:
         print(f"❌ Error de PostgreSQL ejecutando {function_name}: {e}")
