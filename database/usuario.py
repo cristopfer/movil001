@@ -44,3 +44,13 @@ def sp_loguearse(correo, password):
     except Exception as e:
         raise Exception(f"Error en login: {str(e)}")
 
+def sp_registrar_usuario(nombre, correo, password):
+    """
+    Registrar nuevo usuario
+    Retorna: 1=éxito, excepción en caso de error
+    """
+    try:
+        result = call_postgres_function('sp_registrar_usuario', [nombre, correo, password])
+        return result
+    except Exception as e:
+        raise Exception(f"Error registrando usuario: {str(e)}")

@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from database.conexion import init_db, test_connection, close_all_connections
-from database.usuario import sp_loguearse
+from database.usuario import sp_loguearse, sp_registrar_usuario
 
 app = Flask(__name__)
 
@@ -109,6 +109,63 @@ def login():
             "success": False,
             "error": str(e)
         }), 401
+
+@app.route('/api/register', methods=['POST', 'OPTIONS'])
+def register():
+    """Endpoint para registro de nuevo usuario"""
+    if request.method == 'OPTIONS':
+        return jsonify({"status": "OK"}), 200
+        
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({
+                "success": False,
+                "error": "No se recibieron datos JSON"
+            }), 400
+            
+        nombre = data.get('nombre')
+        correo = data.get('correo')
+        password = data.get('password')
+        
+        # Validar campos requeridos
+        if not nombre or not correo or not password:
+            return jsonify({
+                "success": False,
+                "error": "Nombre, correo y password son requeridos"
+            }), 400
+        
+        # Validar longitud mínima de password
+        if len(password) < 6:
+            return jsonify({
+                "success": False,
+                "error": "La contraseña debe tener al menos 6 caracteres"
+            }), 400
+        
+        # Llamar a la función de PostgreSQL
+        resultado = sp_registrar_usuario(nombre, correo, password)
+        
+        if resultado == 1:
+            return jsonify({
+                "success": True,
+                "message": "Usuario registrado exitosamente",
+                "user": {
+                    "nombre": nombre,
+                    "correo": correo,
+                    "estado": 0  # Estado inactivo por defecto
+                }
+            }), 201
+        else:
+            return jsonify({
+                "success": False,
+                "error": "Error desconocido al registrar usuario"
+            }), 500
+        
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 400
 
 # Manejo de errores global
 @app.errorhandler(404)
