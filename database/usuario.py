@@ -19,15 +19,21 @@ def call_postgres_function(function_name, params=None):
             # Para funciones que retornan valores escalares
             result = cursor.fetchone()
             
+            # 🔥 IMPORTANTE: Hacer commit para confirmar los cambios
+            connection.commit()
+            
             if result:
                 return result[0]  # Retornar el primer valor (escalar)
             else:
                 return None
                 
     except psycopg2.Error as e:
+        # En caso de error, hacer rollback
+        connection.rollback()
         print(f"❌ Error de PostgreSQL ejecutando {function_name}: {e}")
         raise Exception(f"Error de base de datos: {e}")
     except Exception as e:
+        connection.rollback()
         print(f"❌ Error ejecutando función {function_name}: {e}")
         raise e
     finally:
@@ -50,7 +56,9 @@ def sp_registrar_usuario(nombre, correo, password):
     Retorna: 1=éxito, excepción en caso de error
     """
     try:
+        print(f"📝 Intentando registrar usuario: {nombre}, {correo}")
         result = call_postgres_function('sp_registrar_usuario', [nombre, correo, password])
+        print(f"✅ Resultado de sp_registrar_usuario: {result}")
         return result
     except Exception as e:
         raise Exception(f"Error registrando usuario: {str(e)}")
