@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from database.conexion import init_db, test_connection, close_all_connections
-from database.usuario import sp_loguearse, sp_registrar_usuario
+from database.usuario import sp_loguearse, sp_registrar_usuario, sp_aceptar_condiciones
 
 app = Flask(__name__)
 
@@ -159,6 +159,53 @@ def register():
             return jsonify({
                 "success": False,
                 "error": "Error desconocido al registrar usuario"
+            }), 500
+        
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 400
+
+@app.route('/api/accept-terms', methods=['POST', 'OPTIONS'])
+def accept_terms():
+    """Endpoint para aceptar términos y condiciones"""
+    if request.method == 'OPTIONS':
+        return jsonify({"status": "OK"}), 200
+        
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({
+                "success": False,
+                "error": "No se recibieron datos JSON"
+            }), 400
+            
+        correo = data.get('correo')
+        password = data.get('password')
+        
+        if not correo or not password:
+            return jsonify({
+                "success": False,
+                "error": "Correo y password son requeridos"
+            }), 400
+        
+        # Llamar a la función de PostgreSQL
+        resultado = sp_aceptar_condiciones(correo, password)
+        
+        if resultado == 1:
+            return jsonify({
+                "success": True,
+                "message": "Términos y condiciones aceptados exitosamente. Cuenta activada.",
+                "user": {
+                    "correo": correo,
+                    "estado": 1  # Estado activo
+                }
+            }), 200
+        else:
+            return jsonify({
+                "success": False,
+                "error": "Error desconocido al aceptar términos y condiciones"
             }), 500
         
     except Exception as e:

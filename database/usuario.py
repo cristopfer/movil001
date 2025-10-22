@@ -62,3 +62,14 @@ def sp_registrar_usuario(nombre, correo, password):
         return result
     except Exception as e:
         raise Exception(f"Error registrando usuario: {str(e)}")
+
+def sp_aceptar_condiciones(correo, password):
+    """
+    Aceptar términos y condiciones y activar usuario
+    Retorna: 1=éxito, excepción en caso de error
+    """
+    try:
+        result = call_postgres_function('sp_aceptar_condiciones', [correo, password])
+        return result
+    except Exception as e:
+        raise Exception(f"Error aceptando condiciones: {str(e)}")
