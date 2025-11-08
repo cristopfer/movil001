@@ -231,7 +231,7 @@ if __name__ == "__main__":
     print("=" * 50)
     
     # Verificar archivos del modelo
-    archivo_modelo = 'checkpoint_epoch_8.pth.tar'
+    archivo_modelo = 'checkpoint_epochdn_8.pth.tar'
     if os.path.exists(archivo_modelo):
         print(f"✅ {archivo_modelo} - ENCONTRADO")
     else:
