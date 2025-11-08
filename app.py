@@ -1,3 +1,6 @@
+import os
+# Crear carpeta para uploads si no existe
+os.makedirs('temp_uploads', exist_ok=True)
 from flask import Flask, request, jsonify
 from dotenv import load_dotenv
 
@@ -12,17 +15,28 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from modelos.modelo_clasificacion import ClasificadorProstata
 
-# Crear instancia global del clasificador
-clasificador = ClasificadorProstata()
-if clasificador.model is not None:
-    print("✅ Modelo de IA cargado correctamente")
-else:
-    print("❌ No se pudo cargar el modelo de IA")
+clasificador = None
+
+def get_clasificador():
+    global clasificador
+    if clasificador is None:
+        print("🔄 Cargando modelo de IA...")
+        try:
+            # ✅ CORREGIDO: Nombre correcto de la clase
+            clasificador = ClasificadorProstata()
+            # Liberar memoria después de cargar
+            gc.collect()
+            print("✅ Modelo de IA cargado correctamente")
+        except Exception as e:
+            print(f"❌ Error cargando modelo: {e}")
+            clasificador = None
+    return clasificador
 
 app = Flask(__name__)
 
 # Configuración
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'tu-clave-secreta-aqui')
+app.config['UPLOAD_FOLDER'] = 'temp_uploads'  # <-- AGREGAR esta línea
 
 # Headers CORS manuales
 @app.after_request
@@ -58,8 +72,9 @@ def analizar_imagen():
         return jsonify({"status": "OK"}), 200
         
     try:
-        # Verificar si el modelo está cargado
-        if clasificador is None or clasificador.model is None:
+        # ✅ CORREGIDO: Usar la variable local correctamente
+        clasificador_local = get_clasificador()
+        if clasificador_local is None or clasificador_local.model is None:
             return jsonify({
                 "success": False,
                 "error": "Modelo de IA no disponible"
@@ -84,9 +99,12 @@ def analizar_imagen():
         # Verificar extensión del archivo
         allowed_extensions = {'png', 'jpg', 'jpeg', 'gif', 'bmp'}
         if file and '.' in file.filename and file.filename.rsplit('.', 1)[1].lower() in allowed_extensions:
-            # Generar nombre único para el archivo
+            # ✅ CORREGIDO: datetime ahora está importado
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             filename = f"prostata_{timestamp}_{file.filename}"
+            
+            # Crear directorio temporal si no existe
+            os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
             filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
             
             # Guardar archivo temporal
@@ -94,9 +112,9 @@ def analizar_imagen():
             print(f"📁 Imagen guardada temporalmente: {filename}")
             
             try:
-                # Procesar imagen con el modelo de IA
+                # ✅ CORREGIDO: Usar clasificador_local en lugar de clasificador
                 print("🔬 Procesando imagen con modelo de IA...")
-                resultado = clasificador.predecir_imagen(filepath)
+                resultado = clasificador_local.predecir_imagen(filepath)
                 
                 if resultado:
                     print(f"✅ Análisis completado: {resultado['clasificacion']}")
@@ -145,8 +163,9 @@ def analizar_imagen():
 def ai_status():
     """Endpoint para verificar estado del modelo de IA"""
     try:
-        if clasificador and clasificador.model is not None:
-            info = clasificador.get_info()
+        clasificador_temp = get_clasificador()
+        if clasificador_temp and clasificador_temp.model is not None:
+            info = clasificador_temp.get_info()
             return jsonify({
                 "status": "loaded",
                 "message": "Modelo de IA cargado correctamente",
@@ -372,8 +391,9 @@ if __name__ == '__main__':
     except Exception as e:
         print(f"❌ Error inicializando base de datos: {e}")
 
-    # Verificar estado del modelo de IA
-    if clasificador and clasificador.model is not None:
+    # ✅ CORREGIDO: Verificar correctamente el estado del modelo
+    clasificador_temp = get_clasificador()
+    if clasificador_temp and clasificador_temp.model is not None:
         print("✅ Modelo de IA cargado correctamente")
     else:
         print("❌ Modelo de IA no disponible")
