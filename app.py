@@ -362,7 +362,7 @@ def shutdown():
     close_all_connections()
 
 if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 10000))
+    port = int(os.environ.get('PORT', 8000))
     debug = os.environ.get('DEBUG', 'False').lower() == 'true'
     
     # Inicializar la base de datos al iniciar el servidor
