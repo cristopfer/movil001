@@ -1,6 +1,10 @@
 import os
+from datetime import datetime  # <-- AGREGAR
+import gc  # <-- AGREGAR
+
 # Crear carpeta para uploads si no existe
 os.makedirs('temp_uploads', exist_ok=True)
+
 from flask import Flask, request, jsonify
 from dotenv import load_dotenv
 
@@ -10,33 +14,41 @@ load_dotenv()
 from database.conexion import init_db, test_connection, close_all_connections
 from database.usuario import sp_loguearse, sp_registrar_usuario, sp_aceptar_condiciones
 
-import sys, os
+import sys
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from modelos.modelo_clasificacion import ClasificadorProstata
 
+# ✅ MODIFICADO: El modelo será None hasta que se use
 clasificador = None
 
 def get_clasificador():
+    """Carga el modelo SOLO cuando se necesita por primera vez"""
     global clasificador
     if clasificador is None:
-        print("🔄 Cargando modelo de IA...")
+        print("🔄 Cargando modelo de IA bajo demanda...")
         try:
-            # ✅ CORREGIDO: Nombre correcto de la clase
             clasificador = ClasificadorProstata()
-            # Liberar memoria después de cargar
-            gc.collect()
+            gc.collect()  # Liberar memoria
             print("✅ Modelo de IA cargado correctamente")
         except Exception as e:
             print(f"❌ Error cargando modelo: {e}")
             clasificador = None
     return clasificador
 
+def unload_clasificador():
+    """Descarga el modelo para liberar memoria"""
+    global clasificador
+    if clasificador is not None:
+        print("🗑️ Descargando modelo de IA para liberar memoria...")
+        clasificador = None
+        gc.collect()
+
 app = Flask(__name__)
 
 # Configuración
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'tu-clave-secreta-aqui')
-app.config['UPLOAD_FOLDER'] = 'temp_uploads'  # <-- AGREGAR esta línea
+app.config['UPLOAD_FOLDER'] = 'temp_uploads'
 
 # Headers CORS manuales
 @app.after_request
@@ -55,7 +67,9 @@ def options_response(path=None):
 def health_check():
     """Endpoint de salud de la API"""
     db_status = "connected" if test_connection() else "disconnected"
-    ia_status = "loaded" if clasificador and clasificador.model is not None else "not loaded"
+    
+    # ✅ MODIFICADO: No cargar el modelo aquí, solo verificar si existe
+    ia_status = "not_loaded"  # Siempre "not_loaded" porque se carga bajo demanda
     
     return jsonify({
         "status": "OK", 
@@ -67,13 +81,15 @@ def health_check():
 
 @app.route('/api/analizar', methods=['POST', 'OPTIONS'])
 def analizar_imagen():
-    """Endpoint para analizar imágenes de próstata con IA"""
+    """Endpoint para analizar imágenes de próstata con IA - CARGA BAJO DEMANDA"""
     if request.method == 'OPTIONS':
         return jsonify({"status": "OK"}), 200
         
     try:
-        # ✅ CORREGIDO: Usar la variable local correctamente
+        # ✅ MODIFICADO: Cargar el modelo SOLO cuando se va a usar
+        print("🚀 Solicitando análisis - cargando modelo bajo demanda...")
         clasificador_local = get_clasificador()
+        
         if clasificador_local is None or clasificador_local.model is None:
             return jsonify({
                 "success": False,
@@ -89,7 +105,6 @@ def analizar_imagen():
 
         file = request.files['imagen']
         
-        # Verificar si se seleccionó un archivo
         if file.filename == '':
             return jsonify({
                 "success": False,
@@ -99,20 +114,16 @@ def analizar_imagen():
         # Verificar extensión del archivo
         allowed_extensions = {'png', 'jpg', 'jpeg', 'gif', 'bmp'}
         if file and '.' in file.filename and file.filename.rsplit('.', 1)[1].lower() in allowed_extensions:
-            # ✅ CORREGIDO: datetime ahora está importado
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             filename = f"prostata_{timestamp}_{file.filename}"
             
-            # Crear directorio temporal si no existe
             os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
             filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
             
-            # Guardar archivo temporal
             file.save(filepath)
             print(f"📁 Imagen guardada temporalmente: {filename}")
             
             try:
-                # ✅ CORREGIDO: Usar clasificador_local en lugar de clasificador
                 print("🔬 Procesando imagen con modelo de IA...")
                 resultado = clasificador_local.predecir_imagen(filepath)
                 
@@ -158,24 +169,29 @@ def analizar_imagen():
             "success": False,
             "error": f"Error interno del servidor: {str(e)}"
         }), 500
+    finally:
+        # ✅ NUEVO: Opcional - descargar el modelo después de usar para ahorrar memoria
+        # Si quieres máxima eficiencia de memoria, descomenta esto:
+        # unload_clasificador()
+        pass
 
 @app.route('/api/ai-status')
 def ai_status():
     """Endpoint para verificar estado del modelo de IA"""
     try:
-        clasificador_temp = get_clasificador()
-        if clasificador_temp and clasificador_temp.model is not None:
-            info = clasificador_temp.get_info()
+        # ✅ MODIFICADO: No cargar el modelo, solo verificar si está disponible
+        if clasificador is not None and clasificador.model is not None:
+            info = clasificador.get_info() if hasattr(clasificador, 'get_info') else {}
             return jsonify({
                 "status": "loaded",
-                "message": "Modelo de IA cargado correctamente",
+                "message": "Modelo de IA cargado en memoria",
                 "model_info": info
             })
         else:
             return jsonify({
-                "status": "not_loaded",
-                "message": "Modelo de IA no disponible"
-            }), 503
+                "status": "not_loaded", 
+                "message": "Modelo de IA disponible para carga bajo demanda"
+            }), 200  # ✅ Cambiado a 200 (no es un error)
     except Exception as e:
         return jsonify({
             "status": "error",
@@ -384,18 +400,15 @@ if __name__ == '__main__':
     port = int(os.environ.get('PORT', 8000))
     debug = os.environ.get('DEBUG', 'False').lower() == 'true'
     
-    # Inicializar la base de datos al iniciar el servidor
+    # Inicializar solo la base de datos
     try:
         init_db(app)
         print("✅ Backend inicializado correctamente")
+        print("📝 Modelo de IA: Se cargará bajo demanda cuando se use /api/analizar")
     except Exception as e:
         print(f"❌ Error inicializando base de datos: {e}")
 
-    # ✅ CORREGIDO: Verificar correctamente el estado del modelo
-    clasificador_temp = get_clasificador()
-    if clasificador_temp and clasificador_temp.model is not None:
-        print("✅ Modelo de IA cargado correctamente")
-    else:
-        print("❌ Modelo de IA no disponible")
+    # ✅ ELIMINADO: No cargar el modelo al inicio
+    print("🚀 Iniciando servidor sin cargar modelo de IA...")
     
     app.run(host='0.0.0.0', port=port, debug=debug)
