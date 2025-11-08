@@ -91,6 +91,7 @@ def health_check():
 @app.route('/api/analizar', methods=['POST', 'OPTIONS'])
 def analizar_imagen():
     """Endpoint para analizar imágenes de próstata con IA - CARGA BAJO DEMANDA"""
+    print("✅ /api/analizar ENDPOINT ACCEDIDO")
     if request.method == 'OPTIONS':
         return jsonify({"status": "OK"}), 200
         
