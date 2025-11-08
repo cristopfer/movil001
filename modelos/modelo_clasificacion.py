@@ -30,7 +30,7 @@ class ClasificadorProstata:
             if not os.path.exists(self.model_path):
                 # Buscar en el directorio modelo
                 modelo_dir = os.path.dirname(__file__)
-                ruta_alternativa = os.path.join(modelo_dir, 'checkpoint_epoch_8.pth.tar')
+                ruta_alternativa = os.path.join(modelo_dir, 'checkpoint_epochdn_8.pth.tar')
                 if os.path.exists(ruta_alternativa):
                     self.model_path = ruta_alternativa
                 else:
