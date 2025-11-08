@@ -46,9 +46,18 @@ def unload_clasificador():
 
 app = Flask(__name__)
 
-# Configuración
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'tu-clave-secreta-aqui')
 app.config['UPLOAD_FOLDER'] = 'temp_uploads'
+
+# ✅ INICIALIZACIÓN DE BASE DE DATOS PARA GUNICORN - AGREGAR ESTO
+print("🚀 Inicializando base de datos para Gunicorn...")
+try:
+    # Inicializar el pool de conexiones
+    from database.conexion import init_db
+    init_db(app)
+    print("✅ Base de datos inicializada correctamente para Gunicorn")
+except Exception as e:
+    print(f"❌ Error inicializando BD para Gunicorn: {e}")
 
 # Headers CORS manuales
 @app.after_request
