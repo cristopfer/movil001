@@ -4,7 +4,6 @@ import torchvision.transforms as transforms
 from PIL import Image
 import timm
 import os
-import hashlib
 
 class ClasificadorProstata:
     def __init__(self, model_path='checkpoint_epochdn_8.pth.tar'):
@@ -44,7 +43,7 @@ class ClasificadorProstata:
             # Cargar checkpoint
             checkpoint = torch.load(self.model_path, map_location=self.device)
             
-            # Manejar diferentes formatos de checkpoint
+            # Manejar diferentes formats de checkpoint
             if 'state_dict' in checkpoint:
                 state_dict = checkpoint['state_dict']
             else:
@@ -69,7 +68,7 @@ class ClasificadorProstata:
             image_path (str): Ruta a la imagen a analizar
             
         Returns:
-            dict: Resultado estructurado con la clasificación
+            dict: Resultado estructurado con la clasificación (SIN ÁREA)
         """
         try:
             # Verificar que el modelo esté cargado
@@ -120,7 +119,7 @@ class ClasificadorProstata:
             probabilidades (numpy.array): Array de probabilidades para cada clase
             
         Returns:
-            dict: Resultado en formato estructurado
+            dict: Resultado en formato estructurado SIN ÁREA
         """
         # Probabilidad de clase positiva (anomalía)
         prob_positiva = probabilidades[1]
@@ -148,33 +147,23 @@ class ClasificadorProstata:
             clasificacion = "PIRADS 1-2"
             recomendacion = "Continuar con seguimiento según indicaciones médicas"
         
-        # Determinar área de manera consistente basada en el hash del archivo
-        areas = [
-            "Región periférica izquierda", 
-            "Región periférica derecha", 
-            "Zona de transición", 
-            "Región central"
-        ]
-        
-        # Usar hash para determinar área de manera pseudo-aleatoria pero consistente
-        area_index = hash(clase_predicha + str(prob_positiva)) % len(areas)
-        area_predicha = areas[area_index]
+        # ✅ MODIFICADO: ELIMINADO el campo "area" - ahora lo proporciona la segmentación
         
         # Construir resultado final
         resultado = {
             "riesgo": riesgo,
             "riesgoTexto": riesgo_texto,
-            "area": area_predicha,
+            # "area": ELIMINADO - lo proporciona segmentación
             "probabilidad": f"{porcentaje_positivo}%",
             "clasificacion": clasificacion,
             "recomendacion": recomendacion
         }
         
-        print(f"🎯 Resultado estructurado generado:")
+        print(f"🎯 Resultado estructurado generado (SIN ÁREA):")
         print(f"   - Clasificación: {clasificacion}")
         print(f"   - Probabilidad: {porcentaje_positivo}%")
         print(f"   - Riesgo: {riesgo}")
-        print(f"   - Área: {area_predicha}")
+        # No se imprime área
         
         return resultado
     
